@@ -4,6 +4,7 @@ local hdf5 = ffi.load("hdf5")
 
 local ffi     =   require("ffi")
 local array   =   require("ljarray.array")
+local h5common=   require("h5common")
 
 
 local modname = ...
@@ -18,11 +19,12 @@ package.loaded[modname] = H5
 
 --general
 
-ffi.cdef[[
-typedef int hid_t;
-typedef int herr_t;
-]]
-
+local h5g     =   require("h5g")
+--[[
+for k,v in pairs(h5g) do
+  H5[k] = h5g[k]
+end
+]]--
 --H5F
 
 h5.F_ACC={
@@ -129,8 +131,6 @@ h5.T_CLASSES = {
 }
 
 
-
-
 h5.getDtype = function(data_type)
   print("bla")
   local type_id = hdf5.H5Tget_class(data_type)
@@ -139,10 +139,6 @@ h5.getDtype = function(data_type)
 end
 
 --H5S 
-ffi.cdef[[
-typedef unsigned long long hsize_t;
-typedef signed long long hssize_t;
-]]
 
 ffi.cdef[[
 typedef enum H5S_seloper_t {
@@ -277,21 +273,41 @@ end
 
 
 H5.rH5data = function(filename, datasetname, slicing, verbose) 
-  local flags     =   h5.F_ACC["RDWR"]
-  local fapl_id   =   0
-  local filehandle=   h5.FileHandle(hdf5.H5Fopen(filename, flags, fapl_id))
+  local buf = nil
+  local success = nil
+  do
+    local flags     =   h5.F_ACC["RDWR"]
+    local fapl_id   =   0
+    local filehandle=   h5.FileHandle(hdf5.H5Fopen(filename, flags, fapl_id))
 
-  local datahandle=   h5.DataHandle(hdf5.H5Dopen2(filehandle.id, datasetname))
-  local dataset_dtype= hdf5.H5Dget_type(datahandle.id)
+    local datahandle=   h5.DataHandle(hdf5.H5Dopen2(filehandle.id, datasetname))
+    local dataset_dtype= hdf5.H5Dget_type(datahandle.id)
 
-  local array_dtype = h5.getDtype(dataset_dtype)
-  print(array_dtype, "blub")
-  local success,buf = h5.getSlice(datahandle, slicing, dataset_dtype, array_dtype)
-  if not success then
-    error("Something broke while reading the slice")
+    local array_dtype = h5.getDtype(dataset_dtype)
+    print(array_dtype, "blub")
+    success,buf = h5.getSlice(datahandle, slicing, dataset_dtype, array_dtype)
+    print(success, "READING")
+    if not success then
+      print("Error reading slice, further proceedings NYI")
+      --error("Something broke while reading the slice")
+    end
   end
+  collectgarbage()
 
-  return buf
+  return buf, success
 end
 
+
+H5.printSets = function(filename, index, operator_data) 
+  do
+    if not index then
+      index = 0
+    end
+    local flags     =   h5.F_ACC["RDONLY"]
+    local fapl_id   =   0
+    local filehandle=   h5.FileHandle(hdf5.H5Fopen(filename, flags, fapl_id))
+    local success = h5g.printSets(filehandle, index, operator_data)
+  end
+  collectgarbage()
+end
 
